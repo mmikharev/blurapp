@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 final class AppStore {
     private enum Constants {
         static let maxRecentApplications = 8
@@ -23,7 +24,7 @@ final class AppStore {
         state = initialState
     }
 
-    deinit {
+    @MainActor deinit {
         shutdown()
     }
 
@@ -260,3 +261,4 @@ final class AppStore {
         }
     }
 }
+

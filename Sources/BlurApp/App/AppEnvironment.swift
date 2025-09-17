@@ -6,14 +6,25 @@ struct AppEnvironment {
     var dateProvider: () -> Date
 
     static func live(
-        focusEngine: FocusEngine = FocusEngine(),
-        preferencesStore: AppPreferencesStore = .shared,
-        dateProvider: @escaping () -> Date = Date.init
+        focusEngine: FocusEngine,
+        preferencesStore: AppPreferencesStore,
+        dateProvider: @escaping () -> Date
     ) -> AppEnvironment {
         AppEnvironment(
             focusEngine: focusEngine,
             preferencesStore: preferencesStore,
             dateProvider: dateProvider
+        )
+    }
+
+    @MainActor static func live() -> AppEnvironment {
+        let engine = FocusEngine()
+        let prefs = AppPreferencesStore.shared
+        let now: () -> Date = Date.init
+        return AppEnvironment(
+            focusEngine: engine,
+            preferencesStore: prefs,
+            dateProvider: now
         )
     }
 }
