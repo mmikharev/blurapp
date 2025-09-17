@@ -17,6 +17,18 @@ A macOS menu bar utility that dims everything except the focused app or window, 
 2. Set the run destination to “My Mac (Designed for macOS)”.
 3. Build & run (`⌘R`). macOS will prompt for Accessibility access on first launch.
 
+### Command-line build
+
+If you prefer building without opening Xcode, the package can be compiled with the
+Swift Package Manager:
+
+```bash
+swift build --configuration release
+```
+
+The resulting binary will be emitted to `.build/release/BlurApp`. You can launch it
+directly or from Finder after moving it into `/Applications`.
+
 > **Note:** the CLI harness used by this agent cannot complete `swift build` locally because of sandbox/toolchain constraints; Xcode on a developer machine builds the package without issue.
 
 ## First-Run Checklist
