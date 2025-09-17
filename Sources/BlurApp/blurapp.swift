@@ -1,9 +1,14 @@
-// The Swift Programming Language
-// https://docs.swift.org/swift-book
+import AppKit
 
 @main
-struct blurapp {
+enum BlurAppMain {
     static func main() {
-        print("Hello, world!")
+        if Thread.isMainThread {
+            startBlurApp()
+        } else {
+            DispatchQueue.main.sync {
+                startBlurApp()
+            }
+        }
     }
 }
