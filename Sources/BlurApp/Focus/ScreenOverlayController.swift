@@ -1,5 +1,6 @@
 import AppKit
 
+@MainActor
 final class ScreenOverlayController {
     private(set) var screen: NSScreen
     private let window: OverlayWindow
@@ -42,3 +43,4 @@ final class ScreenOverlayController {
         window.ignoresMouseEvents = ignores
     }
 }
+

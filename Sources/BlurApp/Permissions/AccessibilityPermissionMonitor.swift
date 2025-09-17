@@ -1,6 +1,7 @@
 import ApplicationServices
 import Foundation
 
+@MainActor
 final class AccessibilityPermissionMonitor {
     private var timer: DispatchSourceTimer?
 
@@ -9,8 +10,10 @@ final class AccessibilityPermissionMonitor {
     }
 
     func requestAuthorizationPrompt() {
-        let options: CFDictionary = [kAXTrustedCheckOptionPrompt as String: true] as CFDictionary
-        AXIsProcessTrustedWithOptions(options)
+        // Avoid referencing the non-Sendable CF global `kAXTrustedCheckOptionPrompt` directly.
+        // The documented key string for this option is "AXTrustedCheckOptionPrompt".
+        let options: [String: Any] = ["AXTrustedCheckOptionPrompt": true]
+        _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
     }
 
     func startMonitoring(interval: TimeInterval = 1.5, handler: @escaping (Bool) -> Void) {
@@ -30,3 +33,4 @@ final class AccessibilityPermissionMonitor {
         timer = nil
     }
 }
+

@@ -2,6 +2,13 @@ import AppKit
 import ApplicationServices
 import QuartzCore
 
+// Some SDKs don't surface this constant in Swift headers. Define it here.
+private let kAXWindowNumberAttribute: String = "AXWindowNumber"
+
+// Fallbacks for AX constants that may be missing from some Swift headers.
+private let kAXBundleIdentifierAttribute: String = "AXBundleIdentifier"
+private let kAXSheetSubrole: String = "AXSheet"
+
 final class AccessibilityWindowTracker {
     private let systemWideElement = AXUIElementCreateSystemWide()
     private var lastHoveredWindow: WindowSnapshot?
@@ -205,17 +212,18 @@ final class AccessibilityWindowTracker {
         return NSScreen.main?.displayID
     }
 
-    private func copyAttributeValue<T>(element: AXUIElement, attribute: CFString) -> T? {
+    private func copyAttributeValue<T>(element: AXUIElement, attribute: String) -> T? {
         var ref: CFTypeRef?
-        let result = AXUIElementCopyAttributeValue(element, attribute, &ref)
+        let result = AXUIElementCopyAttributeValue(element, attribute as CFString, &ref)
         guard result == .success, let value = ref as? T else { return nil }
         return value
     }
 
-    private func copyAttributeValues(element: AXUIElement, attribute: CFString) -> [AXUIElement]? {
+    private func copyAttributeValues(element: AXUIElement, attribute: String) -> [AXUIElement]? {
         var ref: CFTypeRef?
-        let result = AXUIElementCopyAttributeValue(element, attribute, &ref)
+        let result = AXUIElementCopyAttributeValue(element, attribute as CFString, &ref)
         guard result == .success else { return nil }
         return ref as? [AXUIElement]
     }
 }
+

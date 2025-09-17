@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 
 struct FocusConfiguration {
     var mode: FocusMode = .activeApp

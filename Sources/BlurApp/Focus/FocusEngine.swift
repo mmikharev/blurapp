@@ -5,6 +5,7 @@ import OSLog
 /// Coordinates the dimming overlays and responds to focus changes.
 /// Owns per-display overlays, listens for workspace and accessibility events,
 /// and queries the Accessibility API for focus windows.
+@MainActor
 final class FocusEngine {
     private struct Constants {
         static let refreshThrottle: TimeInterval = 0.08
@@ -34,7 +35,9 @@ final class FocusEngine {
     private var isSuspendedBySystemUI = false
 
     deinit {
-        stop()
+        Task { @MainActor [weak self] in
+            self?.stop()
+        }
     }
 
     func start() {
@@ -367,7 +370,7 @@ final class FocusEngine {
             return
         }
 
-        let notifications: [CFString] = [
+        let notifications: [String] = [
             kAXFocusedWindowChangedNotification,
             kAXWindowCreatedNotification,
             kAXWindowDeminiaturizedNotification,
@@ -378,7 +381,7 @@ final class FocusEngine {
 
         let refcon = Unmanaged.passUnretained(self).toOpaque()
         for notification in notifications {
-            let status = AXObserverAddNotification(observer, appElement, notification, refcon)
+            let status = AXObserverAddNotification(observer, appElement, notification as CFString, refcon)
             if status != .success {
                 let name = notification as String
                 log.debug("AXObserverAddNotification failed for \(name, privacy: .public) with status \(status.rawValue, privacy: .public)")
@@ -393,7 +396,7 @@ final class FocusEngine {
 
     private func handleAXNotification(_ notification: String) {
         switch notification {
-        case kAXFocusedWindowChangedNotification as String:
+        case kAXFocusedWindowChangedNotification:
             scheduleFocusRefresh(animated: true)
         default:
             scheduleFocusRefresh(animated: false)

@@ -1,5 +1,6 @@
 import AppKit
 
+@MainActor
 final class AppCoordinator {
     private let focusEngine: FocusEngine
     private let menuBarController: MenuBarController
@@ -176,7 +177,7 @@ final class AppCoordinator {
     }
 }
 
-extension AppCoordinator: MenuBarControllerDelegate {
+extension AppCoordinator: @MainActor MenuBarControllerDelegate {
     func menuBarController(_ controller: MenuBarController, didToggleEnabled isEnabled: Bool) {
         state.isEnabled = isEnabled
         persistState()
@@ -254,7 +255,7 @@ extension AppCoordinator: MenuBarControllerDelegate {
     }
 }
 
-extension AppCoordinator: AccessibilityOnboardingDelegate {
+extension AppCoordinator: @MainActor AccessibilityOnboardingDelegate {
     func accessibilityOnboardingDidRequestPrompt(_ controller: AccessibilityOnboardingWindowController) {
         permissionMonitor.requestAuthorizationPrompt()
     }
@@ -268,7 +269,7 @@ extension AppCoordinator: AccessibilityOnboardingDelegate {
     }
 }
 
-extension AppCoordinator: PreferencesWindowControllerDelegate {
+extension AppCoordinator: @MainActor PreferencesWindowControllerDelegate {
     func preferencesController(_ controller: PreferencesWindowController, didSelectMode mode: FocusMode) {
         state.mode = mode
         persistState()
@@ -317,3 +318,4 @@ extension AppCoordinator: PreferencesWindowControllerDelegate {
         }
     }
 }
+

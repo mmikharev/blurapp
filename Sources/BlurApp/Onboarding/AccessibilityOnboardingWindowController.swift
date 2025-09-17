@@ -45,6 +45,7 @@ final class AccessibilityOnboardingWindowController: NSWindowController {
     }
 }
 
+@MainActor
 extension AccessibilityOnboardingWindowController: AccessibilityOnboardingViewControllerDelegate {
     func onboardingViewControllerDidTapGrantAccess(_ controller: AccessibilityOnboardingViewController) {
         onboardingDelegate?.accessibilityOnboardingDidRequestPrompt(self)
@@ -55,12 +56,13 @@ extension AccessibilityOnboardingWindowController: AccessibilityOnboardingViewCo
     }
 }
 
-private protocol AccessibilityOnboardingViewControllerDelegate: AnyObject {
+@MainActor
+protocol AccessibilityOnboardingViewControllerDelegate: AnyObject {
     func onboardingViewControllerDidTapGrantAccess(_ controller: AccessibilityOnboardingViewController)
     func onboardingViewControllerDidTapContinue(_ controller: AccessibilityOnboardingViewController)
 }
 
-private final class AccessibilityOnboardingViewController: NSViewController {
+final class AccessibilityOnboardingViewController: NSViewController {
     weak var delegate: AccessibilityOnboardingViewControllerDelegate?
 
     private let descriptionText = "BlurApp needs Accessibility permission to read window shapes and stay aligned with your active workspace."

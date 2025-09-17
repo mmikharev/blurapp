@@ -12,6 +12,7 @@ private struct PreferencesPayload: Codable {
     var feather: Double
 }
 
+@MainActor
 final class AppPreferencesStore {
     static let shared = AppPreferencesStore()
 
