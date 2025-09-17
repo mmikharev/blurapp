@@ -148,10 +148,10 @@ final class AccessibilityWindowTracker {
         guard isStandardWindow(element: element) else { return nil }
         guard let frame = fetchFrame(for: element) else { return nil }
         guard let screenID = screenIdentifier(for: frame) else { return nil }
-        guard let windowNumber: Int = copyAttributeValue(element: element, attribute: kAXWindowNumberAttribute) else { return nil }
+        guard let windowNumberValue: NSNumber = copyAttributeValue(element: element, attribute: kAXWindowNumberAttribute) else { return nil }
 
         return WindowSnapshot(
-            windowID: CGWindowID(windowNumber),
+            windowID: CGWindowID(windowNumberValue.uint32Value),
             frame: frame,
             screenID: screenID,
             appBundleIdentifier: bundleIdentifier
