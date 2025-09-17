@@ -2,43 +2,37 @@ import AppKit
 
 @MainActor
 final class AppCoordinator {
-    private let focusEngine: FocusEngine
+    private let store: AppStore
     private let menuBarController: MenuBarController
-    private let preferencesStore: AppPreferencesStore
     private let permissionMonitor: AccessibilityPermissionMonitor
 
     private var preferencesWindow: PreferencesWindowController?
     private var onboardingWindow: AccessibilityOnboardingWindowController?
-    private var pauseTimer: DispatchSourceTimer?
     private var workspaceObserver: NSObjectProtocol?
-
-    private var state: AppState {
-        didSet {
-            menuBarController.refresh(using: state)
-            preferencesWindow?.update(with: state)
-        }
-    }
+    private var stateObserverToken: UUID?
 
     init(
-        focusEngine: FocusEngine = FocusEngine(),
-        preferencesStore: AppPreferencesStore = .shared,
+        store: AppStore = AppStore(),
         permissionMonitor: AccessibilityPermissionMonitor = AccessibilityPermissionMonitor()
     ) {
-        self.focusEngine = focusEngine
-        self.preferencesStore = preferencesStore
+        self.store = store
         self.permissionMonitor = permissionMonitor
-        self.state = preferencesStore.loadState()
         self.menuBarController = MenuBarController()
         self.menuBarController.delegate = self
     }
 
     func start() {
-        menuBarController.refresh(using: state)
+        stateObserverToken = store.subscribe { [weak self] state in
+            guard let self else { return }
+            self.menuBarController.refresh(using: state)
+            self.preferencesWindow?.update(with: state)
+        }
+
         registerWorkspaceObserver()
         registerInitialFrontmostApplication()
 
         if permissionMonitor.isAuthorized {
-            activateFocusEngine()
+            store.activateFocusEngine()
         } else {
             presentOnboardingIfNeeded()
             permissionMonitor.startMonitoring { [weak self] authorized in
@@ -46,15 +40,17 @@ final class AppCoordinator {
                 if authorized {
                     self.permissionMonitor.stopMonitoring()
                     self.dismissOnboarding()
-                    self.activateFocusEngine()
+                    self.store.activateFocusEngine()
                 }
             }
         }
     }
 
     func stop() {
-        pauseTimer?.cancel()
-        pauseTimer = nil
+        if let token = stateObserverToken {
+            store.unsubscribe(token)
+            stateObserverToken = nil
+        }
         if let observer = workspaceObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
             workspaceObserver = nil
@@ -62,7 +58,7 @@ final class AppCoordinator {
         permissionMonitor.stopMonitoring()
         onboardingWindow?.dismiss()
         preferencesWindow?.close()
-        focusEngine.stop()
+        store.shutdown()
     }
 
     // MARK: - Permissions
@@ -79,31 +75,6 @@ final class AppCoordinator {
     private func dismissOnboarding() {
         onboardingWindow?.dismiss()
         onboardingWindow = nil
-    }
-
-    private func activateFocusEngine() {
-        configureFocusEngine()
-        focusEngine.start()
-        updateFocusEngineEnabledState()
-    }
-
-    private func configureFocusEngine() {
-        focusEngine.setIntensity(state.intensity)
-        focusEngine.setExcludedBundles(state.excludedBundleIdentifiers)
-        focusEngine.updateConfiguration { configuration in
-            configuration.mode = state.mode
-            configuration.followMouse = state.followMouseEnabled
-            configuration.animationDuration = state.animationDuration
-            configuration.cornerRadius = state.cornerRadius
-            configuration.focusInset = state.focusInset
-            configuration.feather = state.feather
-        }
-    }
-
-    private func updateFocusEngineEnabledState() {
-        let now = Date()
-        let isPaused = state.pauseUntil.map { $0 > now } ?? false
-        focusEngine.setEnabled(state.isEnabled && !isPaused)
     }
 
     // MARK: - Workspace Tracking
@@ -131,113 +102,48 @@ final class AppCoordinator {
         guard let bundleID = app.bundleIdentifier else { return }
         let displayName = app.localizedName ?? bundleID
         let identity = ApplicationIdentity(bundleIdentifier: bundleID, displayName: displayName)
-
-        var recent = state.recentApplications
-        recent.removeAll { $0.bundleIdentifier == bundleID }
-        recent.insert(identity, at: 0)
-        if recent.count > 8 {
-            recent = Array(recent.prefix(8))
-        }
-        state.recentApplications = recent
-    }
-
-    // MARK: - Pause Handling
-
-    private func schedulePause(until date: Date) {
-        pauseTimer?.cancel()
-        let timer = DispatchSource.makeTimerSource(queue: .main)
-        timer.schedule(deadline: .now() + max(0, date.timeIntervalSinceNow))
-        timer.setEventHandler { [weak self] in
-            self?.pauseTimerFired()
-        }
-        timer.resume()
-        pauseTimer = timer
-        state.pauseUntil = date
-        updateFocusEngineEnabledState()
-    }
-
-    private func pauseTimerFired() {
-        pauseTimer?.cancel()
-        pauseTimer = nil
-        state.pauseUntil = nil
-        updateFocusEngineEnabledState()
-    }
-
-    private func cancelPause() {
-        pauseTimer?.cancel()
-        pauseTimer = nil
-        state.pauseUntil = nil
-        updateFocusEngineEnabledState()
-    }
-
-    // MARK: - Persistence
-
-    private func persistState() {
-        preferencesStore.saveState(state)
+        store.dispatch(.recordRecentApplication(identity))
     }
 }
 
 extension AppCoordinator: @MainActor MenuBarControllerDelegate {
     func menuBarController(_ controller: MenuBarController, didToggleEnabled isEnabled: Bool) {
-        state.isEnabled = isEnabled
-        persistState()
-        updateFocusEngineEnabledState()
-        if isEnabled && permissionMonitor.isAuthorized && !focusEngine.isRunning {
-            activateFocusEngine()
+        store.dispatch(.setEnabled(isEnabled))
+        if isEnabled && permissionMonitor.isAuthorized {
+            store.activateFocusEngine()
         }
     }
 
     func menuBarController(_ controller: MenuBarController, didChangeIntensity value: Double) {
-        state.intensity = value
-        persistState()
-        focusEngine.setIntensity(value)
+        store.dispatch(.setIntensity(value))
     }
 
     func menuBarController(_ controller: MenuBarController, didSelectMode mode: FocusMode) {
-        state.mode = mode
-        persistState()
-        focusEngine.updateConfiguration { configuration in
-            configuration.mode = mode
-        }
+        store.dispatch(.setMode(mode))
     }
 
     func menuBarController(_ controller: MenuBarController, didToggleFollowMouse isEnabled: Bool) {
-        state.followMouseEnabled = isEnabled
-        persistState()
-        focusEngine.updateConfiguration { configuration in
-            configuration.followMouse = isEnabled
-        }
+        store.dispatch(.setFollowMouse(isEnabled))
     }
 
     func menuBarController(_ controller: MenuBarController, didRequestPause duration: TimeInterval) {
         let deadline = Date().addingTimeInterval(duration)
-        schedulePause(until: deadline)
+        store.dispatch(.schedulePause(until: deadline))
     }
 
     func menuBarControllerDidRequestResume(_ controller: MenuBarController) {
-        cancelPause()
+        store.dispatch(.cancelPause)
     }
 
     func menuBarController(_ controller: MenuBarController, didToggleExclusion bundleIdentifier: String) {
-        if state.excludedBundleIdentifiers.contains(bundleIdentifier) {
-            state.excludedBundleIdentifiers.remove(bundleIdentifier)
-        } else {
-            state.excludedBundleIdentifiers.insert(bundleIdentifier)
-        }
-        persistState()
-        focusEngine.setExcludedBundles(state.excludedBundleIdentifiers)
+        store.dispatch(.toggleExclusion(bundleIdentifier))
     }
 
     func menuBarControllerDidRequestAddFrontmostAppToExclusions(_ controller: MenuBarController) {
         guard let app = NSWorkspace.shared.frontmostApplication, let bundleID = app.bundleIdentifier else { return }
-        state.excludedBundleIdentifiers.insert(bundleID)
         let displayName = app.localizedName ?? bundleID
         let identity = ApplicationIdentity(bundleIdentifier: bundleID, displayName: displayName)
-        if !state.recentApplications.contains(where: { $0.bundleIdentifier == bundleID }) {
-            state.recentApplications.insert(identity, at: 0)
-        }
-        persistState()
-        focusEngine.setExcludedBundles(state.excludedBundleIdentifiers)
+        store.dispatch(.addExclusion(identity))
     }
 
     func menuBarControllerDidRequestPreferences(_ controller: MenuBarController) {
@@ -246,7 +152,7 @@ extension AppCoordinator: @MainActor MenuBarControllerDelegate {
             window.preferencesDelegate = self
             preferencesWindow = window
         }
-        preferencesWindow?.update(with: state)
+        preferencesWindow?.update(with: store.currentState)
         preferencesWindow?.present()
     }
 
@@ -264,58 +170,34 @@ extension AppCoordinator: @MainActor AccessibilityOnboardingDelegate {
         if permissionMonitor.isAuthorized {
             permissionMonitor.stopMonitoring()
             dismissOnboarding()
-            activateFocusEngine()
+            store.activateFocusEngine()
         }
     }
 }
 
 extension AppCoordinator: @MainActor PreferencesWindowControllerDelegate {
     func preferencesController(_ controller: PreferencesWindowController, didSelectMode mode: FocusMode) {
-        state.mode = mode
-        persistState()
-        focusEngine.updateConfiguration { configuration in
-            configuration.mode = mode
-        }
+        store.dispatch(.setMode(mode))
     }
 
     func preferencesController(_ controller: PreferencesWindowController, didToggleFollowMouse isEnabled: Bool) {
-        state.followMouseEnabled = isEnabled
-        persistState()
-        focusEngine.updateConfiguration { configuration in
-            configuration.followMouse = isEnabled
-        }
+        store.dispatch(.setFollowMouse(isEnabled))
     }
 
     func preferencesController(_ controller: PreferencesWindowController, didChangeAnimationDuration value: TimeInterval) {
-        state.animationDuration = value
-        persistState()
-        focusEngine.updateConfiguration { configuration in
-            configuration.animationDuration = value
-        }
+        store.dispatch(.setAnimationDuration(value))
     }
 
     func preferencesController(_ controller: PreferencesWindowController, didChangeCornerRadius value: CGFloat) {
-        state.cornerRadius = value
-        persistState()
-        focusEngine.updateConfiguration { configuration in
-            configuration.cornerRadius = value
-        }
+        store.dispatch(.setCornerRadius(value))
     }
 
     func preferencesController(_ controller: PreferencesWindowController, didChangeFocusInset value: CGFloat) {
-        state.focusInset = value
-        persistState()
-        focusEngine.updateConfiguration { configuration in
-            configuration.focusInset = value
-        }
+        store.dispatch(.setFocusInset(value))
     }
 
     func preferencesController(_ controller: PreferencesWindowController, didChangeFeather value: CGFloat) {
-        state.feather = value
-        persistState()
-        focusEngine.updateConfiguration { configuration in
-            configuration.feather = value
-        }
+        store.dispatch(.setFeather(value))
     }
 }
 

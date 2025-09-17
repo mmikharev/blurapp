@@ -22,6 +22,11 @@ let package = Package(
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")
             ]
+        ),
+        .testTarget(
+            name: "BlurAppTests",
+            dependencies: ["BlurApp"],
+            path: "Tests/BlurAppTests"
         )
     ]
 )
