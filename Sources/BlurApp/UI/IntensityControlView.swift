@@ -27,10 +27,10 @@ final class IntensityControlView: NSView {
         glassView.addSubview(slider)
 
         NSLayoutConstraint.activate([
-            glassView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
-            glassView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
-            glassView.topAnchor.constraint(equalTo: topAnchor, constant: 4),
-            glassView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4),
+            glassView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            glassView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            glassView.topAnchor.constraint(equalTo: topAnchor),
+            glassView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
             titleLabel.leadingAnchor.constraint(equalTo: glassView.leadingAnchor, constant: 16),
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: glassView.trailingAnchor, constant: -16),
