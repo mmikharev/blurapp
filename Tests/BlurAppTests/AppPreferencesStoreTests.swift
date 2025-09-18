@@ -96,6 +96,27 @@ final class AppPreferencesStoreTests: XCTestCase {
         XCTAssertEqual(state.feather, CGFloat(payload.feather))
     }
 
+    func testLoadStateClampsNegativeFocusInsetToZero() throws {
+        let payload = StoredPreferencesPayload(
+            isEnabled: true,
+            intensity: 0.5,
+            mode: .activeApp,
+            followMouseEnabled: false,
+            excludedBundleIdentifiers: [],
+            animationDuration: 0.2,
+            cornerRadius: 10,
+            focusInset: -5,
+            feather: 12
+        )
+
+        let data = try JSONEncoder().encode(payload)
+        defaults.set(data, forKey: "com.blurapp.preferences.v1")
+
+        let state = store.loadState()
+
+        XCTAssertEqual(state.focusInset, 0)
+    }
+
     func testLoadStateWithCorruptedDataResetsStore() {
         defaults.set(Data([0x00, 0x01]), forKey: "com.blurapp.preferences.v1")
 

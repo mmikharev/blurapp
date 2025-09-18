@@ -40,7 +40,7 @@ final class AppPreferencesStore {
             state.excludedBundleIdentifiers = Set(payload.excludedBundleIdentifiers)
             state.animationDuration = payload.animationDuration
             state.cornerRadius = CGFloat(payload.cornerRadius)
-            state.focusInset = CGFloat(payload.focusInset)
+            state.focusInset = max(0, CGFloat(payload.focusInset))
             state.feather = CGFloat(payload.feather)
             return state
         } catch {
@@ -58,7 +58,7 @@ final class AppPreferencesStore {
             excludedBundleIdentifiers: Array(state.excludedBundleIdentifiers),
             animationDuration: state.animationDuration,
             cornerRadius: Double(state.cornerRadius),
-            focusInset: Double(state.focusInset),
+            focusInset: Double(max(0, state.focusInset)),
             feather: Double(state.feather)
         )
 
