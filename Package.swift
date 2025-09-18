@@ -16,6 +16,7 @@ let package = Package(
         .executableTarget(
             name: "BlurApp",
             path: "Sources/BlurApp",
+            exclude: ["Resources/Info.plist"],
             resources: [
                 .process("Resources")
             ],

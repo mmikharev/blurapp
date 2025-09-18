@@ -9,7 +9,7 @@ import OSLog
 final class FocusEngine {
     private struct Constants {
         static let refreshThrottle: TimeInterval = 0.02
-        static let mouseThrottle: TimeInterval = 0.05
+        static let mouseThrottle: TimeInterval = 0.08
     }
 
     private let log = Logger(subsystem: "com.blurapp.core", category: "FocusEngine")
@@ -33,6 +33,8 @@ final class FocusEngine {
     private var isEnabled = true
     private var currentIntensity: CGFloat = 0.6
     private var isSuspendedBySystemUI = false
+
+    private var lastAXEventAt: Date = .distantPast
 
     deinit {
         Task { @MainActor [weak self] in
@@ -337,7 +339,8 @@ final class FocusEngine {
         // with the focused window in overlay coordinates.
         rect.origin.y = overlayFrame.size.height - rect.origin.y - rect.size.height
 
-        rect = rect.insetBy(dx: -configuration.focusInset, dy: -configuration.focusInset)
+        // Removed insetBy call here as per instructions
+        // rect = rect.insetBy(dx: -configuration.focusInset, dy: -configuration.focusInset)
 
         let screenBounds = CGRect(origin: .zero, size: overlayFrame.size)
         rect = rect.intersection(screenBounds)
@@ -415,6 +418,8 @@ final class FocusEngine {
     }
 
     private func handleAXNotification(_ notification: String) {
+        guard shouldAcceptAXEvent() else { return }
+
         switch notification {
         case kAXFocusedWindowChangedNotification:
             scheduleFocusRefresh(animated: true)
@@ -431,6 +436,13 @@ final class FocusEngine {
     }
 
     // MARK: - Helpers
+
+    private func shouldAcceptAXEvent() -> Bool {
+        let now = Date()
+        if now.timeIntervalSince(lastAXEventAt) < 0.03 { return false }
+        lastAXEventAt = now
+        return true
+    }
 
     private func nearlyEqual(_ lhs: CGRect, _ rhs: CGRect, tolerance: CGFloat) -> Bool {
         abs(lhs.origin.x - rhs.origin.x) <= tolerance &&

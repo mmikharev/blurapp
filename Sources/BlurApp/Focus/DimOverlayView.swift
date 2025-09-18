@@ -41,7 +41,7 @@ final class DimOverlayView: NSView {
         animated: Bool
     ) {
         let path = CGMutablePath()
-        let expandedBounds = bounds.insetBy(dx: -2, dy: -2)
+        let expandedBounds = bounds
         path.addRect(expandedBounds)
 
         for rect in holes {
@@ -53,6 +53,13 @@ final class DimOverlayView: NSView {
         dimLayer.shadowRadius = feather
         dimLayer.shadowColor = NSColor.black.cgColor
         dimLayer.shadowOffset = .zero
+
+        if feather > 0 {
+            dimLayer.shouldRasterize = true
+            dimLayer.rasterizationScale = dimLayer.contentsScale
+        } else {
+            dimLayer.shouldRasterize = false
+        }
 
         let applyChanges = {
             self.dimLayer.path = path
