@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import OSLog
 import QuartzCore
 
 // Some SDKs don't surface this constant in Swift headers. Define it here.
@@ -14,15 +15,23 @@ final class AccessibilityWindowTracker {
     private var lastHoveredWindow: WindowSnapshot?
     private var lastHoverTimestamp: CFTimeInterval = 0
     private let followMouseHysteresis: CFTimeInterval = 0.20
+    private let log = Logger(subsystem: "com.blurapp.core", category: "AXTracker")
 
     func focusedWindows(
         configuration: FocusConfiguration,
         exclusions: Set<String>
     ) -> [WindowSnapshot] {
-        guard AXIsProcessTrusted() else { return [] }
-        guard let frontmostApp = NSWorkspace.shared.frontmostApplication else { return [] }
+        guard AXIsProcessTrusted() else {
+            log.debug("AX not trusted")
+            return []
+        }
+        guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
+            log.debug("No frontmost application")
+            return []
+        }
 
         if let bundleID = frontmostApp.bundleIdentifier, exclusions.contains(bundleID) {
+            log.debug("Frontmost app excluded: \(bundleID, privacy: .public)")
             return []
         }
 
@@ -31,6 +40,7 @@ final class AccessibilityWindowTracker {
 
         if configuration.followMouse {
             if let hoveredWindow = windowUnderCursor(exclusions: exclusions) {
+                log.debug("Follow mouse window id=\(hoveredWindow.windowID, privacy: .public)")
                 let now = CACurrentMediaTime()
                 if let last = lastHoveredWindow, last.windowID == hoveredWindow.windowID {
                     lastHoveredWindow = hoveredWindow
@@ -72,6 +82,7 @@ final class AccessibilityWindowTracker {
                 bundleIdentifier: bundleIdentifier,
                 exclusions: exclusions
             ) {
+                log.debug("Focused window id=\(focused.windowID, privacy: .public)")
                 return [focused]
             }
             if let first = windows(
@@ -79,6 +90,7 @@ final class AccessibilityWindowTracker {
                 bundleIdentifier: bundleIdentifier,
                 exclusions: exclusions
             ).first {
+                log.debug("Fallback window id=\(first.windowID, privacy: .public)")
                 return [first]
             }
             return []
@@ -148,10 +160,17 @@ final class AccessibilityWindowTracker {
         guard isStandardWindow(element: element) else { return nil }
         guard let frame = fetchFrame(for: element) else { return nil }
         guard let screenID = screenIdentifier(for: frame) else { return nil }
-        guard let windowNumberValue: NSNumber = copyAttributeValue(element: element, attribute: kAXWindowNumberAttribute) else { return nil }
+        let windowID: CGWindowID
+        if let windowNumberValue: NSNumber = copyAttributeValue(element: element, attribute: kAXWindowNumberAttribute) {
+            windowID = CGWindowID(windowNumberValue.uint32Value)
+        } else {
+            let pointerValue = UInt(bitPattern: Unmanaged.passUnretained(element).toOpaque())
+            windowID = CGWindowID(truncatingIfNeeded: pointerValue)
+            log.debug("Missing AXWindowNumber; synthesizing id=\(windowID, privacy: .public)")
+        }
 
         return WindowSnapshot(
-            windowID: CGWindowID(windowNumberValue.uint32Value),
+            windowID: windowID,
             frame: frame,
             screenID: screenID,
             appBundleIdentifier: bundleIdentifier
@@ -226,4 +245,3 @@ final class AccessibilityWindowTracker {
         return ref as? [AXUIElement]
     }
 }
-

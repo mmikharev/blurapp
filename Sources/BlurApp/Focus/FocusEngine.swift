@@ -251,6 +251,12 @@ final class FocusEngine {
             exclusions: excludedBundleIdentifiers
         )
 
+        if snapshots.isEmpty {
+            let trusted = AXIsProcessTrusted()
+            let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "nil"
+            log.debug("No focus windows. trusted=\(trusted, privacy: .public) frontmost=\(bundleID, privacy: .public)")
+        }
+
         lastSnapshots = snapshots
         applySnapshots(snapshots, animated: animated)
     }
@@ -273,7 +279,13 @@ final class FocusEngine {
             }
 
             let holes = screenSnapshots.compactMap { snapshot -> CGRect? in
-                convert(snapshot.frame, toOverlayFor: screen)
+                let converted = convert(snapshot.frame, toOverlayFor: screen)
+                if let converted {
+                    log.debug("Display \(displayID, privacy: .public) window \(snapshot.windowID, privacy: .public) global=\(snapshot.frame.debugDescription, privacy: .public) local=\(converted.debugDescription, privacy: .public) screen=\(screen.frame.debugDescription, privacy: .public)")
+                } else {
+                    log.debug("Display \(displayID, privacy: .public) window \(snapshot.windowID, privacy: .public) dropped; frame=\(snapshot.frame.debugDescription, privacy: .public) screen=\(screen.frame.debugDescription, privacy: .public)")
+                }
+                return converted
             }
 
             let dimAlpha = shouldHideForFullScreen(screenSnapshots: screenSnapshots, screen: screen) ? 0.0 : currentIntensity
