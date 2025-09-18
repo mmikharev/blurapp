@@ -196,12 +196,16 @@ final class AccessibilityWindowTracker {
         guard let subrole: String = copyAttributeValue(element: element, attribute: kAXSubroleAttribute) else {
             return true
         }
+
+        // We intentionally include floating panels, sheets and other auxiliary
+        // windows that belong to the focused application so that the dimming
+        // overlay never covers controls or popovers that appear above the
+        // primary window. Only exclude a small set of known non-visual
+        // containers.
         let excludedSubroles: Set<String> = [
-            kAXSystemDialogSubrole as String,
-            kAXFloatingWindowSubrole as String,
-            kAXSheetSubrole as String,
-            "AXPopover"
+            "AXUnknown"
         ]
+
         return !excludedSubroles.contains(subrole)
     }
 
