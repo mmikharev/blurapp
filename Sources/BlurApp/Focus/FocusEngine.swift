@@ -330,6 +330,13 @@ final class FocusEngine {
         guard let overlayFrame = screen.frameIfFinite else { return nil }
         var rect = windowFrame
         rect = rect.offsetBy(dx: -overlayFrame.origin.x, dy: -overlayFrame.origin.y)
+
+        // AX frames are expressed with an origin at the upper-left corner of the
+        // screen, while our overlay view uses the conventional AppKit origin at
+        // the lower-left corner. Flip the Y coordinate so the highlight lines up
+        // with the focused window in overlay coordinates.
+        rect.origin.y = overlayFrame.size.height - rect.origin.y - rect.size.height
+
         rect = rect.insetBy(dx: -configuration.focusInset, dy: -configuration.focusInset)
 
         let screenBounds = CGRect(origin: .zero, size: overlayFrame.size)
