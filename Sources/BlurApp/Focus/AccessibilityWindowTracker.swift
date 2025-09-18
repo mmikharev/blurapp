@@ -9,6 +9,18 @@ private let kAXWindowNumberAttribute: String = "AXWindowNumber"
 // Fallbacks for AX constants that may be missing from some Swift headers.
 private let kAXBundleIdentifierAttribute: String = "AXBundleIdentifier"
 private let kAXSheetSubrole: String = "AXSheet"
+private let kAXModalParentAttribute: String = "AXModalParent"
+
+private let stageManagerBundleIdentifiers: Set<String> = [
+    "com.apple.WindowManager",
+    "com.apple.WindowManager.shell",
+    "com.apple.WindowManager.QuickSwitcher"
+]
+
+private let remoteSheetBundlePrefixes: [String] = [
+    "com.apple.AppKit.xpc.openAndSavePanelService",
+    "com.apple.appkit.xpc.openAndSavePanelService"
+]
 
 final class AccessibilityWindowTracker {
     private let systemWideElement = AXUIElementCreateSystemWide()
@@ -107,9 +119,11 @@ final class AccessibilityWindowTracker {
         }
 
         return windowElements.compactMap { element in
-            guard let bundleID = bundleIdentifier ?? enclosingBundleIdentifier(for: element) else { return nil }
-            guard !exclusions.contains(bundleID) else { return nil }
-            return createSnapshot(for: element, bundleIdentifier: bundleID)
+            createSnapshot(
+                for: element,
+                defaultBundleIdentifier: bundleIdentifier,
+                exclusions: exclusions
+            )
         }
     }
 
@@ -121,9 +135,11 @@ final class AccessibilityWindowTracker {
         guard let element: AXUIElement = copyAttributeValue(element: appElement, attribute: kAXFocusedWindowAttribute) else {
             return nil
         }
-        guard let bundleID = bundleIdentifier ?? enclosingBundleIdentifier(for: element) else { return nil }
-        guard !exclusions.contains(bundleID) else { return nil }
-        return createSnapshot(for: element, bundleIdentifier: bundleID)
+        return createSnapshot(
+            for: element,
+            defaultBundleIdentifier: bundleIdentifier,
+            exclusions: exclusions
+        )
     }
 
     private func windowUnderCursor(exclusions: Set<String>) -> WindowSnapshot? {
@@ -151,12 +167,23 @@ final class AccessibilityWindowTracker {
             return nil
         }
         guard role == (kAXWindowRole as String) else { return nil }
-        guard let bundleID = enclosingBundleIdentifier(for: element) else { return nil }
-        guard !exclusions.contains(bundleID) else { return nil }
-        return createSnapshot(for: element, bundleIdentifier: bundleID)
+        return createSnapshot(
+            for: element,
+            defaultBundleIdentifier: nil,
+            exclusions: exclusions
+        )
     }
 
-    private func createSnapshot(for element: AXUIElement, bundleIdentifier: String) -> WindowSnapshot? {
+    private func createSnapshot(
+        for element: AXUIElement,
+        defaultBundleIdentifier: String?,
+        exclusions: Set<String>
+    ) -> WindowSnapshot? {
+        guard let bundleID = resolveBundleIdentifier(
+            for: element,
+            defaultBundleIdentifier: defaultBundleIdentifier
+        ) else { return nil }
+        guard !exclusions.contains(bundleID) else { return nil }
         guard isStandardWindow(element: element) else { return nil }
         guard let frame = fetchFrame(for: element) else { return nil }
         guard let screenID = screenIdentifier(for: frame) else { return nil }
@@ -173,8 +200,48 @@ final class AccessibilityWindowTracker {
             windowID: windowID,
             frame: frame,
             screenID: screenID,
-            appBundleIdentifier: bundleIdentifier
+            appBundleIdentifier: bundleID
         )
+    }
+
+    private func resolveBundleIdentifier(
+        for element: AXUIElement,
+        defaultBundleIdentifier: String?
+    ) -> String? {
+        if let defaultBundleIdentifier {
+            return remapBundleIdentifier(defaultBundleIdentifier, for: element)
+        }
+
+        guard let inferred = enclosingBundleIdentifier(for: element) else { return nil }
+        return remapBundleIdentifier(inferred, for: element)
+    }
+
+    private func remapBundleIdentifier(_ bundleIdentifier: String, for element: AXUIElement) -> String? {
+        if stageManagerBundleIdentifiers.contains(bundleIdentifier) {
+            // Stage Manager stack thumbnails should not contribute focus windows.
+            return nil
+        }
+
+        if isRemoteSheetBundle(bundleIdentifier) {
+            if let parentBundle = modalParentBundleIdentifier(for: element) {
+                return parentBundle
+            }
+        }
+
+        return bundleIdentifier
+    }
+
+    private func isRemoteSheetBundle(_ bundleIdentifier: String) -> Bool {
+        remoteSheetBundlePrefixes.contains { prefix in
+            bundleIdentifier.hasPrefix(prefix)
+        }
+    }
+
+    private func modalParentBundleIdentifier(for element: AXUIElement) -> String? {
+        guard let parent: AXUIElement = copyAttributeValue(element: element, attribute: kAXModalParentAttribute) else {
+            return nil
+        }
+        return enclosingBundleIdentifier(for: parent)
     }
 
     private func enclosingBundleIdentifier(for element: AXUIElement) -> String? {
