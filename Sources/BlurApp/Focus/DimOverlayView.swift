@@ -17,6 +17,7 @@ final class DimOverlayView: NSView {
         dimLayer.opacity = 0
         dimLayer.fillRule = .evenOdd
         dimLayer.frame = bounds
+        dimLayer.allowsEdgeAntialiasing = false
         layer?.addSublayer(dimLayer)
     }
 
@@ -28,6 +29,8 @@ final class DimOverlayView: NSView {
     override func layout() {
         super.layout()
         dimLayer.frame = bounds
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2.0
+        dimLayer.contentsScale = scale
     }
 
     func update(
@@ -38,7 +41,8 @@ final class DimOverlayView: NSView {
         animated: Bool
     ) {
         let path = CGMutablePath()
-        path.addRect(bounds)
+        let expandedBounds = bounds.insetBy(dx: -2, dy: -2)
+        path.addRect(expandedBounds)
 
         for rect in holes {
             let roundedRect = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)

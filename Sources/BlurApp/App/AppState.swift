@@ -11,7 +11,7 @@ struct AppState {
     var recentApplications: [ApplicationIdentity] = []
     var animationDuration: TimeInterval = 0.2
     var cornerRadius: CGFloat = 8
-    var focusInset: CGFloat = 6
+    var focusInset: CGFloat = 0
     var feather: CGFloat = 12
 }
 

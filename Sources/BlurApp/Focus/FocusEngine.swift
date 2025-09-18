@@ -8,8 +8,8 @@ import OSLog
 @MainActor
 final class FocusEngine {
     private struct Constants {
-        static let refreshThrottle: TimeInterval = 0.08
-        static let mouseThrottle: TimeInterval = 0.18
+        static let refreshThrottle: TimeInterval = 0.02
+        static let mouseThrottle: TimeInterval = 0.05
     }
 
     private let log = Logger(subsystem: "com.blurapp.core", category: "FocusEngine")
@@ -342,7 +342,8 @@ final class FocusEngine {
         let screenBounds = CGRect(origin: .zero, size: overlayFrame.size)
         rect = rect.intersection(screenBounds)
         guard !rect.isNull, !rect.isEmpty else { return nil }
-        return rect
+        let scale = screen.backingScaleFactor
+        return pixelAlignedRect(rect, scale: scale)
     }
 
     private func shouldHideForFullScreen(screenSnapshots: [WindowSnapshot], screen: NSScreen) -> Bool {
@@ -440,6 +441,20 @@ final class FocusEngine {
 
     private func clamp(_ value: Double, lower: Double, upper: Double) -> Double {
         min(max(value, lower), upper)
+    }
+
+    private func pixelAlignedRect(_ rect: CGRect, scale: CGFloat) -> CGRect {
+        guard scale > 0 else { return rect.integral }
+        var aligned = rect
+        let originX = (rect.origin.x * scale).rounded(.down) / scale
+        let originY = (rect.origin.y * scale).rounded(.down) / scale
+        let maxX = (rect.maxX * scale).rounded(.up) / scale
+        let maxY = (rect.maxY * scale).rounded(.up) / scale
+        aligned.origin.x = originX
+        aligned.origin.y = originY
+        aligned.size.width = maxX - originX
+        aligned.size.height = maxY - originY
+        return aligned
     }
 }
 
